@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Timetable Engine | Admin</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Timetable Engine</h1>
+            <p class="subtitle">Upload Excel data to initialize the system</p>
+        </header>
+
+        <section class="card upload-section fade-in">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <label class="file-label" for="fileInput">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <span id="fileName">Select Excel File (Courses, Slots, Enrollments)</span>
+                    <input type="file" id="fileInput" name="file" accept=".xlsx, .xls" required>
+                </label>
+                <button type="submit" class="btn-upload">Upload & Process</button>
+            </form>
+        </section>
+
+        <section id="statsSection" class="stats-grid hidden fade-in">
+            <div class="stat-card">
+                <div class="stat-value" id="countCourses">0</div>
+                <div class="stat-label">Courses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="countSlots">0</div>
+                <div class="stat-label">Slots</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="countStudents">0</div>
+                <div class="stat-label">Students</div>
+            </div>
+        </section>
+
+        <section id="errorSection" class="card hidden fade-in">
+            <h2>Validation Errors</h2>
+            <ul id="errorList" class="error-list"></ul>
+        </section>
+
+        <section id="dataSection" class="card data-section hidden fade-in">
+            <h2>Parsed Data (Debug)</h2>
+            <pre id="jsonViewer" class="json-viewer"></pre>
+        </section>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameSpan = document.getElementById('fileName');
+        
+        const statsSection = document.getElementById('statsSection');
+        const errorSection = document.getElementById('errorSection');
+        const dataSection = document.getElementById('dataSection');
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                fileNameSpan.textContent = e.target.files[0].name;
+                fileNameSpan.style.color = '#e2e8f0';
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            const submitBtn = form.querySelector('button');
+            const originalBtnText = submitBtn.textContent;
+            
+            submitBtn.textContent = 'Processing...';
+            submitBtn.disabled = true;
+
+            try {
+                // 1. Upload and Parse
+                const uploadRes = await fetch('/admin/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!uploadRes.ok) throw new Error('Upload failed');
+                const uploadData = await uploadRes.json();
+
+                // Validation Errors
+                if (uploadData.errors && uploadData.errors.length > 0) {
+                    const errorList = document.getElementById('errorList');
+                    errorList.innerHTML = uploadData.errors.map(err => `<li class="error-item">${err}</li>`).join('');
+                    errorSection.classList.remove('hidden');
+                } else {
+                    errorSection.classList.add('hidden');
+                }
+
+                // Stats
+                document.getElementById('countCourses').textContent = uploadData.courses;
+                document.getElementById('countSlots').textContent = uploadData.slots;
+                document.getElementById('countStudents').textContent = uploadData.students;
+                statsSection.classList.remove('hidden');
+
+                // 2. Fetch Full Debug Data
+                const debugRes = await fetch('/debug/data');
+                const debugData = await debugRes.json();
+                
+                document.getElementById('jsonViewer').textContent = JSON.stringify(debugData, null, 2);
+                dataSection.classList.remove('hidden');
+
+            } catch (err) {
+                console.error(err);
+                alert('An error occurred: ' + err.message);
+            } finally {
+                submitBtn.textContent = originalBtnText;
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
